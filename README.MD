@@ -18,7 +18,7 @@ Define a network scenario including:
 ### 2.2 Mobility
 Assign appropriate mobility models for the eNodeBs and UEs:
 - [ ] Geographically distribute eNodeBs and UEs to create a realistic network topology.
-  - [ ] Use two different position allocators for the eNodeBs and the UEs.
+- [ ] Use two different position allocators for the eNodeBs and the UEs.
 - [ ] Choose a suitable mobility model for the UEs to mimic the movement of pedestrians.
 
 ### 2.3 Traffic Generation
