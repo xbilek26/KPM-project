@@ -1,6 +1,26 @@
 # LTE Network Simulation in NS-3 – Assignment 05
 
-This README serves as a checklist and documentation for completing the LTE Network Simulation in NS-3 project as per the provided assignment.
+## How to run the project in ns3
+
+### 1. Navigate to the `scratch` Directory
+```bash
+cd /path/to/ns-3/scratch
+```
+
+### 2. Clone the Repository
+```bash
+git clone https://github.com/xbilek26/KPM-project.git
+```
+
+### 3. Navigate back to the ns3 root directory
+```bash
+cd ../
+```
+
+### 4. Run the Simulation
+```bash
+./ns3 run "scratch/KPM-project/script.cc"
+```
 
 ## Objective
 - [ ] Gain hands-on experience in simulating an LTE network using NS-3.
