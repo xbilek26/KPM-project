@@ -2,22 +2,22 @@
 
 ## How to run the project in ns3
 
-### 1. Navigate to the `scratch` Directory
+### 1. Navigate to the `scratch` directory
 ```bash
 cd /path/to/ns-3/scratch
 ```
 
-### 2. Clone the Repository
+### 2. Clone the repository
 ```bash
 git clone https://github.com/xbilek26/KPM-project.git
 ```
 
 ### 3. Navigate back to the ns3 root directory
 ```bash
-cd ../
+cd ..
 ```
 
-### 4. Run the Simulation
+### 4. Run the simulation
 ```bash
 ./ns3 run "scratch/KPM-project/script.cc"
 ```
