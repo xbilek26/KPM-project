@@ -17,6 +17,11 @@ git clone https://github.com/xbilek26/KPM-project.git
 cd ..
 ```
 
+### 4. Open in VS Code and edit
+```bash
+code .
+```
+
 ### 4. Run the simulation
 ```bash
 ./ns3 run "scratch/KPM-project/script.cc"
