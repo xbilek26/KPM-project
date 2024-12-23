@@ -1,4 +1,4 @@
-# README - LTE Network Simulation in NS-3
+# LTE Network Simulation in NS-3 – Assignment 05
 
 This README serves as a checklist and documentation for completing the LTE Network Simulation in NS-3 project as per the provided assignment.
 
