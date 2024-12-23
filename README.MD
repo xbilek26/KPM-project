@@ -35,9 +35,9 @@ code .
 
 ### 2.1 Scenario Definition
 Define a network scenario including:
-- [ ] At least two eNodeBs.
-- [ ] A minimum of five User Equipment (UE) devices.
-- [ ] At least one remote host (server) on the Internet.
+- [x] At least two eNodeBs.
+- [x] A minimum of five User Equipment (UE) devices.
+- [x] At least one remote host (server) on the Internet.
 - [ ] Appropriate IP addressing and routing configuration.
 
 ### 2.2 Mobility
