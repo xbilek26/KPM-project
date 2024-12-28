@@ -5,6 +5,10 @@
  * ...
  * ...
  * 
+ * 
+ * TODO: Mobility (line 119 - 149)
+ * Use two different position allocators for the eNodeBs and the UEs.
+ * Choose a suitable mobility model for the UEs to mimic the movement of pedestrians.
 */
 
 #include "ns3/core-module.h"
@@ -14,6 +18,7 @@
 #include "ns3/point-to-point-helper.h"
 #include "ns3/point-to-point-epc-helper.h"
 #include "ns3/lte-helper.h"
+#include "ns3/netanim-module.h"
 #include "ns3/applications-module.h"
 
 /* ---------------------------- SIMULATION SCENARIO ----------------------------
@@ -54,6 +59,7 @@
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE("KPMProjectScript");
+
 
 int main(int argc, char *argv[])
 {
@@ -111,15 +117,19 @@ int main(int argc, char *argv[])
     InternetStackHelper ueInternet;
     ueInternet.Install(ueNodes);
 
-    // Position allocators for eNodeBs and UEs
+    // TODO: Mobility (I'm not sure if this is correct)
+
     MobilityHelper mobility;
+
+    // eNodeB Position Allocator (Static positions)
     Ptr<ListPositionAllocator> enbPositionAlloc = CreateObject<ListPositionAllocator>();
-    enbPositionAlloc->Add(Vector(0, 0, 0));
-    enbPositionAlloc->Add(Vector(distance, 0, 0));
+    enbPositionAlloc->Add(Vector(0, 0, 0));  // eNodeB 0 at (0, 0, 0)
+    enbPositionAlloc->Add(Vector(distance, 0, 0));  // eNodeB 1 at (distance, 0, 0)
     mobility.SetPositionAllocator(enbPositionAlloc);
-    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel"); // Static positions for eNodeBs
     mobility.Install(enbNodes);
 
+    // UE Position Allocator (Dynamic positions using Random Walk)
     Ptr<RandomRectanglePositionAllocator> uePositionAlloc = CreateObject<RandomRectanglePositionAllocator>();
     Ptr<UniformRandomVariable> xVar = CreateObject<UniformRandomVariable>();
     xVar->SetAttribute("Min", DoubleValue(0.0));
@@ -128,14 +138,15 @@ int main(int argc, char *argv[])
 
     Ptr<UniformRandomVariable> yVar = CreateObject<UniformRandomVariable>();
     yVar->SetAttribute("Min", DoubleValue(0.0));
-    yVar->SetAttribute("Max", DoubleValue(100.0));
+    yVar->SetAttribute("Max", DoubleValue(100.0));  // Limit to 100 units along y-axis
     uePositionAlloc->SetY(yVar);
 
+    // Set the mobility model for UEs to mimic pedestrian movement (Random Walk)
     mobility.SetPositionAllocator(uePositionAlloc);
     mobility.SetMobilityModel("ns3::RandomWalk2dMobilityModel",
-                              "Bounds", StringValue("0|500|0|100"),
-                              "Speed", StringValue("ns3::ConstantRandomVariable[Constant=1.5]"),
-                              "Distance", DoubleValue(10.0));
+                            "Bounds", StringValue("0|500|0|100"),  // Boundaries for UEs' movement area
+                            "Speed", StringValue("ns3::ConstantRandomVariable[Constant=1.5]"),  // Speed of 1.5 m/s (approx walking speed)
+                            "Distance", DoubleValue(10.0));  // Distance moved before changing direction
     mobility.Install(ueNodes);
 
     NetDeviceContainer enbLteDevs = lteHelper->InstallEnbDevice(enbNodes); // Add eNB nodes to the container
@@ -166,12 +177,12 @@ int main(int argc, char *argv[])
     // File Transfer: nodes 0 and 1 send and receive TCP traffic between each other
     for (uint32_t i = 0; i < 2; i++)
     {
-        // traffic sources, TCP clients
+        // Traffic sources, TCP clients
         OnOffHelper onOffHelper("ns3::TcpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(1 - i), tcpPort));
         onOffHelper.SetConstantRate(DataRate("5kbps"));
         sourceApps.Add(onOffHelper.Install(ueNodes.Get(i)));
 
-        // traffic sinks, TCP servers
+        // Traffic sinks, TCP servers
         PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), tcpPort));
         sinkApps.Add(sinkHelper.Install(ueNodes.Get(1 - i)));
     }
@@ -195,11 +206,38 @@ int main(int argc, char *argv[])
     sourceApps.Stop(Seconds(10.0));
     sinkApps.Stop(Seconds(9.0));
 
-    lteHelper->EnableTraces();
-
     // Run simulation
     Simulator::Stop(Seconds(simTime));
     Simulator::Run();
+
+    /*
+
+    AnimationInterface anim("lte-simulation.xml");
+
+    anim.SetConstantPosition(remoteHost, 0.0, 50.0);
+    anim.SetConstantPosition(enbNodes.Get(0), 50.0, 50.0);
+    anim.SetConstantPosition(enbNodes.Get(1), 150.0, 50.0);
+
+    anim.UpdateNodeDescription(remoteHost, "RemoteHost");
+    anim.UpdateNodeDescription(enbNodes.Get(0), "eNodeB_0");
+    anim.UpdateNodeDescription(enbNodes.Get(1), "eNodeB_1");
+    anim.UpdateNodeDescription(ueNodes.Get(0), "UE_0");
+    anim.UpdateNodeDescription(ueNodes.Get(1), "UE_1");
+    anim.UpdateNodeDescription(ueNodes.Get(2), "UE_2");
+    anim.UpdateNodeDescription(ueNodes.Get(3), "UE_3");
+    anim.UpdateNodeDescription(ueNodes.Get(4), "UE_4");
+
+    anim.UpdateNodeColor(remoteHost, 255, 0, 0);
+    anim.UpdateNodeColor(enbNodes.Get(0), 0, 255, 0);
+    anim.UpdateNodeColor(enbNodes.Get(1), 0, 255, 0);
+    anim.UpdateNodeColor(ueNodes.Get(0), 0, 0, 255);
+    anim.UpdateNodeColor(ueNodes.Get(1), 0, 0, 255);
+    anim.UpdateNodeColor(ueNodes.Get(2), 0, 0, 255);
+    anim.UpdateNodeColor(ueNodes.Get(3), 0, 0, 255);
+    anim.UpdateNodeColor(ueNodes.Get(4), 0, 0, 255);
+
+    */
+
     Simulator::Destroy();
 
     return 0;
