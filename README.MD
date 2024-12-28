@@ -27,10 +27,6 @@ code .
 ./ns3 run "scratch/KPM-project/script.cc"
 ```
 
-## Objective
-- [ ] Gain hands-on experience in simulating an LTE network using NS-3.
-- [ ] Create a comprehensive network scenario, configure LTE parameters, and analyze network performance.
-
 ## Task Checklist
 
 ### 2.1 Scenario Definition
@@ -38,7 +34,7 @@ Define a network scenario including:
 - [x] At least two eNodeBs.
 - [x] A minimum of five User Equipment (UE) devices.
 - [x] At least one remote host (server) on the Internet.
-- [ ] Appropriate IP addressing and routing configuration.
+- [x] Appropriate IP addressing and routing configuration.
 
 ### 2.2 Mobility
 Assign appropriate mobility models for the eNodeBs and UEs:
@@ -48,8 +44,8 @@ Assign appropriate mobility models for the eNodeBs and UEs:
 
 ### 2.3 Traffic Generation
 Generate traffic using NS-3 applications:
-- [ ] Two UEs are exchanging files between each other.
-- [ ] Three UEs are streaming videos from the Internet.
+- [x] Two UEs are exchanging files between each other.
+- [x] Three UEs are streaming videos from the Internet.
 
 ### 2.4 Simulation Run
 - [ ] Execute the simulation with different sets of parameters and collect data on network performance.
