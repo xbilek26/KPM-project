@@ -10,15 +10,17 @@
  * 
  */
 
+#include "ns3/applications-module.h"
 #include "ns3/core-module.h"
-#include "ns3/network-module.h"
-#include "ns3/mobility-module.h"
+#include "ns3/flow-monitor-helper.h"
+#include "ns3/flow-monitor-module.h"
 #include "ns3/internet-module.h"
+#include "ns3/lte-helper.h"
+#include "ns3/mobility-module.h"
+#include "ns3/netanim-module.h"
+#include "ns3/network-module.h"
 #include "ns3/point-to-point-helper.h"
 #include "ns3/point-to-point-epc-helper.h"
-#include "ns3/lte-helper.h"
-#include "ns3/netanim-module.h"
-#include "ns3/applications-module.h"
 
 /* ---------------------------- SIMULATION SCENARIO ----------------------------
  *
@@ -62,7 +64,7 @@ NS_LOG_COMPONENT_DEFINE("KPMProjectScript");
 int main(int argc, char *argv[])
 {
     LogComponentEnable("KPMProjectScript", LOG_LEVEL_INFO);
-    LogComponentEnable("PacketSink", LOG_LEVEL_INFO);
+    //LogComponentEnable("PacketSink", LOG_LEVEL_INFO);
 
     ns3::PacketMetadata::Enable();
 
@@ -206,9 +208,41 @@ int main(int argc, char *argv[])
 
     sourceApps.Start(Seconds(0.0));
     sinkApps.Start(Seconds(1.0));
-
     sourceApps.Stop(Seconds(10.0));
     sinkApps.Stop(Seconds(9.0));
+
+    // Flow monitor
+    Ptr <FlowMonitor> monitor;
+    FlowMonitorHelper flowMonHelper;
+    monitor = flowMonHelper.InstallAll();  // Install all nodes in one monitor
+    monitor->Start(Seconds(1.0));  // Optional: start monitoring after some time
+
+    // Po skončení simulace
+    Simulator::Stop(Seconds(simTime));
+    Simulator::Run();
+    monitor->CheckForLostPackets();
+    Ptr <Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowMonHelper.GetClassifier());
+    std::map <FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats();
+
+    std::cout << std::endl << "******* Flow monitor statistics *******" << std::endl;
+    for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator i = stats.begin(); i != stats.end(); i++) {
+        Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(i->first);
+        std::cout << "Flow ID: " << i->first << std::endl;
+        std::cout << "Src add: " << t.sourceAddress << "-> Dst add: " << t.destinationAddress << std::endl;
+        std::cout << "Src port: " << t.sourcePort << "-> Dst port: " << t.destinationPort << std::endl;
+        std::cout << "Tx Packets/Bytes: " << i->second.txPackets << "/" << i->second.txBytes << std::endl;
+        std::cout << "Rx Packets/Bytes: " << i->second.rxPackets << "/" << i->second.rxBytes << std::endl;
+        std::cout << "Throughput: " << i->second.rxBytes * 8.0 / (i->second.timeLastRxPacket.GetSeconds() - i->second.timeFirstTxPacket.GetSeconds()) / 1024 << "kb/s" << std::endl;
+        std::cout << "Delay sum: " << i->second.delaySum.GetMilliSeconds() << "ms" << std::endl;
+        std::cout << "Mean delay: " << (i->second.delaySum.GetSeconds() / i->second.rxPackets) * 1000 << "ms" << std::endl;
+        std::cout << "Jitter sum: " << i->second.jitterSum.GetMilliSeconds() << "ms" << std::endl;
+        std::cout << "Mean jitter: " << (i->second.jitterSum.GetSeconds() / (i->second.rxPackets - 1)) * 1000 << "ms" << std::endl;
+        std::cout << "Lost Packets: " << i->second.txPackets - i->second.rxPackets << std::endl;
+        std::cout << "Packet loss: " << (((i->second.txPackets - i->second.rxPackets) * 1.0) / i->second.txPackets) * 100 << "%" << std::endl;
+        std::cout << "------------------------------------------------" << std::endl;
+    }
+
+    // NetAnim configuration
 
     AnimationInterface::SetConstantPosition(remoteHost, 25.0, 0.0);
     AnimationInterface::SetConstantPosition(pgw, 50.0, 0.0);
