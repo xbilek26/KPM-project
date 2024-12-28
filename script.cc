@@ -29,7 +29,7 @@
  *                           |     PGW 10.0.0.2     |
  *                           +----------------------+
  *                                       |
- *                                       | S1 interface
+ *                                       | (S1 interface)
  *                                       |
  *                       +---------------+----------------+
  *                       |                                |
@@ -41,30 +41,31 @@
  *                       | LTE                            | LTE
  *                       v                                v
  *              +------------------+             +------------------+
- *              | UE 0 192.168.0.1 |             | UE 1 192.168.0.2 |
+ *              |   UE 0 7.0.0.2   |             |   UE 1 7.0.0.3   |
  *              +------------------+             +------------------+
  *              +------------------+             +------------------+
- *              | UE 2 192.168.0.3 |             | UE 3 192.168.0.4 |
+ *              |   UE 2 7.0.0.4   |             |   UE 3 7.0.0.5   |
  *              +------------------+             +------------------+
  *              +------------------+
- *              | UE 4 192.168.0.5 |
+ *              |   UE 4 7.0.0.2   |
  *              +------------------+
  */
 
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE("KPMProject");
+NS_LOG_COMPONENT_DEFINE("KPMProjectScript");
 
 int main(int argc, char *argv[])
 {
-    LogComponentEnable("KPMProject", LOG_LEVEL_INFO);
+    LogComponentEnable("KPMProjectScript", LOG_LEVEL_INFO);
+    LogComponentEnable("PacketSink", LOG_LEVEL_INFO);
 
     // Number of UEs (used multiple times in the code)
     uint32_t numUes = 5;
 
     // Simulation parameters
-    double simTime = 10.0; // Simulation duration in seconds
     double distance = 500.0; // Distance between eNodeBs
+    double simTime = 10.0;
 
     // Create LTE Helper and EPC Helper
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
@@ -101,6 +102,11 @@ int main(int argc, char *argv[])
     NS_LOG_INFO("Remote host address: " << internetIpIfaces.GetAddress(0));
     NS_LOG_INFO("PGW address: " << internetIpIfaces.GetAddress(1));
 
+    // Create static routing
+    Ipv4StaticRoutingHelper ipv4RoutingHelper;
+    Ptr<Ipv4StaticRouting> remoteHostStaticRouting = ipv4RoutingHelper.GetStaticRouting(remoteHost->GetObject<Ipv4>());
+    remoteHostStaticRouting->AddNetworkRouteTo(Ipv4Address("7.0.0.0"), Ipv4Mask("255.0.0.0"), 1);
+
     // Install LTE Internet Stack
     InternetStackHelper ueInternet;
     ueInternet.Install(ueNodes);
@@ -136,9 +142,7 @@ int main(int argc, char *argv[])
     NetDeviceContainer ueLteDevs = lteHelper->InstallUeDevice(ueNodes); // Add UE nodes to the container
 
     // Assign IP addresses to UEs
-    Ipv4AddressHelper ipv4hUEs;
-    ipv4hUEs.SetBase("192.168.0.0", "255.255.255.0");
-    Ipv4InterfaceContainer ueIpIfaces = ipv4hUEs.Assign(NetDeviceContainer(ueLteDevs));
+    Ipv4InterfaceContainer ueIpIfaces = epcHelper->AssignUeIpv4Address(NetDeviceContainer(ueLteDevs));
 
     for (uint32_t i = 0; i < numUes; i++)
     {
@@ -152,48 +156,46 @@ int main(int argc, char *argv[])
         NS_LOG_INFO("Attached UE " << i << " to eNodeB " << i % 2);
     }
 
-    // Applications
-    uint16_t dlPort = 1100;
-    uint16_t ulPort = 2000;
-    ApplicationContainer serverApps, clientApps;
+    // Definitions of ports to send traffic to
+    uint16_t tcpPort = 1100;
+    uint16_t udpPort = 2000;
 
-    // File Transfer: TCP
+    // Application containers
+    ApplicationContainer sourceApps, sinkApps;
+
+    // File Transfer: nodes 0 and 1 send and receive TCP traffic between each other
     for (uint32_t i = 0; i < 2; i++)
     {
-        // clients
-        OnOffHelper onOffHelper("ns3::TcpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(1 - i), dlPort));
+        // traffic sources, TCP clients
+        OnOffHelper onOffHelper("ns3::TcpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(1 - i), tcpPort));
         onOffHelper.SetConstantRate(DataRate("5kbps"));
-        clientApps.Add(onOffHelper.Install(ueNodes.Get(i)));
+        sourceApps.Add(onOffHelper.Install(ueNodes.Get(i)));
 
-        // servers
-        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), dlPort));
-        serverApps.Add(sinkHelper.Install(ueNodes.Get(1 - i)));
+        // traffic sinks, TCP servers
+        PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), tcpPort));
+        sinkApps.Add(sinkHelper.Install(ueNodes.Get(1 - i)));
     }
 
-    // Video Streaming: UDP
+    //Video Streaming: nodes 2, 3 and 4 receive UDP traffic from remote host
     for (uint32_t i = 2; i < 5; i++)
     {
-        // client (source) on remoteHost
-        OnOffHelper onOffHelper("ns3::UdpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(i), ulPort));
-        onOffHelper.SetConstantRate(DataRate("5Mbps")); // Set data rate for UDP stream
-        clientApps.Add(onOffHelper.Install(remoteHost)); // Install client on remoteHost
+        // Traffic source (Remote Host), UDP client
+        OnOffHelper onOffHelper("ns3::UdpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(i), udpPort));
+        onOffHelper.SetConstantRate(DataRate("5kbps"));
+        sourceApps.Add(onOffHelper.Install(remoteHost));
 
-        NS_LOG_INFO("UDP Client installed on remoteHost to send traffic to UE " << i
-                    << " with IP " << ueIpIfaces.GetAddress(i));
-
-        // server (sink) on UE nodes
-        PacketSinkHelper sinkHelper("ns3::UdpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), ulPort));
-        serverApps.Add(sinkHelper.Install(ueNodes.Get(i))); // Install server on each UE node
-
-        NS_LOG_INFO("UDP Sink installed on UE " << i
-                    << " to receive traffic on port " << ulPort);
+        // Traffic sinks, UDP servers
+        PacketSinkHelper sinkHelper("ns3::UdpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), udpPort));
+        sinkApps.Add(sinkHelper.Install(ueNodes.Get(i)));
     }
 
-    serverApps.Start(Seconds(1.0));
-    clientApps.Start(Seconds(2.0));
+    sourceApps.Start(Seconds(1.0));
+    sinkApps.Start(Seconds(2.0));
 
-    serverApps.Stop(Seconds(10.0));
-    clientApps.Stop(Seconds(9.0));
+    sourceApps.Stop(Seconds(10.0));
+    sinkApps.Stop(Seconds(9.0));
+
+    lteHelper->EnableTraces();
 
     // Run simulation
     Simulator::Stop(Seconds(simTime));
