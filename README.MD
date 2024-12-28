@@ -33,8 +33,6 @@ code .
 - Mark each checkbox as you complete the corresponding task.
 - Keep this README updated to track your progress throughout the project.
 
----
-
 ### Scenario Definition
 Define a network scenario including:
 - [x] At least two eNodeBs.
