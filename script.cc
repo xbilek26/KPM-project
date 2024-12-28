@@ -1,3 +1,12 @@
+/*
+ * Authors:
+ * Frantisek Bilek <xbilek26@vutbr.cz>
+ * ...
+ * ...
+ * ...
+ * 
+*/
+
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/mobility-module.h"
@@ -7,36 +16,66 @@
 #include "ns3/lte-helper.h"
 #include "ns3/applications-module.h"
 
+/* ---------------------------- SIMULATION SCENARIO ----------------------------
+ *
+ *                           +----------------------+
+ *                           | Remote Host 10.0.0.1 |
+ *                           +----------------------+
+ *                                       |
+ *                                       | Point-to-Point (Internet)
+ *                                       |
+ *                                       v
+ *                           +----------------------+
+ *                           |     PGW 10.0.0.2     |
+ *                           +----------------------+
+ *                                       |
+ *                                       | S1 interface
+ *                                       |
+ *                       +---------------+----------------+
+ *                       |                                |
+ *                       v                                v
+ *           +------------------------+       +------------------------+
+ *           |        eNodeB 0        |       |        eNodeB 1        |
+ *           +------------------------+       +------------------------+
+ *                       |                                |
+ *                       | LTE                            | LTE
+ *                       v                                v
+ *              +------------------+             +------------------+
+ *              | UE 0 192.168.0.1 |             | UE 1 192.168.0.2 |
+ *              +------------------+             +------------------+
+ *              +------------------+             +------------------+
+ *              | UE 2 192.168.0.3 |             | UE 3 192.168.0.4 |
+ *              +------------------+             +------------------+
+ *              +------------------+
+ *              | UE 4 192.168.0.5 |
+ *              +------------------+
+ */
+
 using namespace ns3;
 
-NS_LOG_COMPONENT_DEFINE("KPMProjectScript");
+NS_LOG_COMPONENT_DEFINE("KPMProject");
 
 int main(int argc, char *argv[])
 {
-    // Povolení logování
-    LogComponentEnable("KPMProjectScript", LOG_LEVEL_INFO);
-    LogComponentEnable("LteHelper", LOG_LEVEL_INFO);
-    LogComponentEnable("PacketSink", LOG_LEVEL_INFO);
+    LogComponentEnable("KPMProject", LOG_LEVEL_INFO);
 
-    // Set simulation parameters
+    // Number of UEs (used multiple times in the code)
+    uint32_t numUes = 5;
+
+    // Simulation parameters
     double simTime = 10.0; // Simulation duration in seconds
     double distance = 500.0; // Distance between eNodeBs
-    uint16_t numUes = 5; // Number of UEs
 
     // Create LTE Helper and EPC Helper
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
     Ptr<PointToPointEpcHelper> epcHelper = CreateObject<PointToPointEpcHelper>();
     lteHelper->SetEpcHelper(epcHelper);
 
-    // Install LTE devices
-    Ptr<Node> pgw = epcHelper->GetPgwNode();
-
     // Create nodes for eNodeBs and UEs
     NodeContainer enbNodes;
-    enbNodes.Create(2); // Two eNodeBs
-
     NodeContainer ueNodes;
-    ueNodes.Create(numUes); // Five UEs
+    enbNodes.Create(2);
+    ueNodes.Create(numUes);
 
     // Create a remote host
     NodeContainer remoteHostContainer;
@@ -49,14 +88,18 @@ int main(int argc, char *argv[])
     PointToPointHelper p2p;
     p2p.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
     p2p.SetChannelAttribute("Delay", StringValue("10ms"));
-    NetDeviceContainer internetDevices = p2p.Install(pgw, remoteHost);
+    Ptr<Node> pgw = epcHelper->GetPgwNode();
+    NetDeviceContainer internetDevices = p2p.Install(remoteHost, pgw);
 
-    Ipv4AddressHelper ipv4;
-    ipv4.SetBase("1.0.0.0", "255.255.255.0");
-    Ipv4InterfaceContainer internetIpIfaces = ipv4.Assign(internetDevices);
-    Ipv4Address remoteHostAddr = internetIpIfaces.GetAddress(1);
-    // Print remote host address
-    NS_LOG_INFO("Remote host address: " << remoteHostAddr);
+    // Enable pcap tracing on point-to-point link
+    p2p.EnablePcapAll("p2p");
+
+    // Assign IP addresses to point-to-point link (internet)
+    Ipv4AddressHelper ipv4hInternet;
+    ipv4hInternet.SetBase("10.0.0.0", "255.255.255.0");
+    Ipv4InterfaceContainer internetIpIfaces = ipv4hInternet.Assign(internetDevices);
+    NS_LOG_INFO("Remote host address: " << internetIpIfaces.GetAddress(0));
+    NS_LOG_INFO("PGW address: " << internetIpIfaces.GetAddress(1));
 
     // Install LTE Internet Stack
     InternetStackHelper ueInternet;
@@ -89,24 +132,24 @@ int main(int argc, char *argv[])
                               "Distance", DoubleValue(10.0));
     mobility.Install(ueNodes);
 
-    // Install LTE Devices to eNodeBs and UEs
-    NetDeviceContainer enbLteDevs = lteHelper->InstallEnbDevice(enbNodes);
-    NetDeviceContainer ueLteDevs = lteHelper->InstallUeDevice(ueNodes);
+    NetDeviceContainer enbLteDevs = lteHelper->InstallEnbDevice(enbNodes); // Add eNB nodes to the container
+    NetDeviceContainer ueLteDevs = lteHelper->InstallUeDevice(ueNodes); // Add UE nodes to the container
 
     // Assign IP addresses to UEs
-    Ipv4InterfaceContainer ueIpIface = epcHelper->AssignUeIpv4Address(NetDeviceContainer(ueLteDevs));
+    Ipv4AddressHelper ipv4hUEs;
+    ipv4hUEs.SetBase("192.168.0.0", "255.255.255.0");
+    Ipv4InterfaceContainer ueIpIfaces = ipv4hUEs.Assign(NetDeviceContainer(ueLteDevs));
 
-    NS_LOG_INFO("Assigned UE IP Addresses:");
     for (uint32_t i = 0; i < numUes; i++)
     {
-        NS_LOG_INFO("UE " << i << " IP Address: " << ueIpIface.GetAddress(i));
+        NS_LOG_INFO("UE " << i << " IP Address: " << ueIpIfaces.GetAddress(i));
     }
 
-    // Attach UEs to eNodeBs
+    // Attach UEs 0, 2 and 4 to eNodeB 0 and UEs 1 and 3 to eNodeB 1
     for (uint32_t i = 0; i < numUes; i++)
     {
         lteHelper->Attach(ueLteDevs.Get(i), enbLteDevs.Get(i % 2));
-        NS_LOG_INFO("Attached UE " << i << " to eNodeB " << (i % 2));
+        NS_LOG_INFO("Attached UE " << i << " to eNodeB " << i % 2);
     }
 
     // Applications
@@ -114,30 +157,36 @@ int main(int argc, char *argv[])
     uint16_t ulPort = 2000;
     ApplicationContainer serverApps, clientApps;
 
-    // File Transfer: BulkSendApplication
+    // File Transfer: TCP
     for (uint32_t i = 0; i < 2; i++)
     {
-        OnOffHelper onOffHelper("ns3::TcpSocketFactory", InetSocketAddress(ueIpIface.GetAddress(1 - i), dlPort));
-
-        onOffHelper.SetConstantRate(DataRate("50Mbps"));
+        // clients
+        OnOffHelper onOffHelper("ns3::TcpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(1 - i), dlPort));
+        onOffHelper.SetConstantRate(DataRate("5kbps"));
         clientApps.Add(onOffHelper.Install(ueNodes.Get(i)));
 
+        // servers
         PacketSinkHelper sinkHelper("ns3::TcpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), dlPort));
         serverApps.Add(sinkHelper.Install(ueNodes.Get(1 - i)));
     }
 
-    // Video Streaming
+    // Video Streaming: UDP
     for (uint32_t i = 2; i < 5; i++)
     {
-        // ERROR HERE
-        OnOffHelper onOffHelper("ns3::UdpSocketFactory", InetSocketAddress(remoteHostAddr, ulPort));
-        
-        onOffHelper.SetConstantRate(DataRate("1Mbps"));
-        clientApps.Add(onOffHelper.Install(ueNodes.Get(i)));
-        
-        //PacketSinkHelper sinkHelper("ns3::UdpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), ulPort));
-        //serverApps.Add(sinkHelper.Install(remoteHost));
-        
+        // client (source) on remoteHost
+        OnOffHelper onOffHelper("ns3::UdpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(i), ulPort));
+        onOffHelper.SetConstantRate(DataRate("5Mbps")); // Set data rate for UDP stream
+        clientApps.Add(onOffHelper.Install(remoteHost)); // Install client on remoteHost
+
+        NS_LOG_INFO("UDP Client installed on remoteHost to send traffic to UE " << i
+                    << " with IP " << ueIpIfaces.GetAddress(i));
+
+        // server (sink) on UE nodes
+        PacketSinkHelper sinkHelper("ns3::UdpSocketFactory", InetSocketAddress(Ipv4Address::GetAny(), ulPort));
+        serverApps.Add(sinkHelper.Install(ueNodes.Get(i))); // Install server on each UE node
+
+        NS_LOG_INFO("UDP Sink installed on UE " << i
+                    << " to receive traffic on port " << ulPort);
     }
 
     serverApps.Start(Seconds(1.0));
@@ -145,9 +194,6 @@ int main(int argc, char *argv[])
 
     serverApps.Stop(Seconds(10.0));
     clientApps.Stop(Seconds(9.0));
-
-    // Enable tracing
-    lteHelper->EnableTraces();
 
     // Run simulation
     Simulator::Stop(Seconds(simTime));
