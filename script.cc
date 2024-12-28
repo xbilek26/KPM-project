@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
         sinkApps.Add(sinkHelper.Install(ueNodes.Get(1 - i)));
     }
 
-    //Video Streaming: nodes 2, 3 and 4 receive UDP traffic from remote host
+    // Video Streaming: nodes 2, 3 and 4 receive UDP traffic from remote host
     for (uint32_t i = 2; i < 5; i++)
     {
         // Traffic source (Remote Host), UDP client
