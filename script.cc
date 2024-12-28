@@ -9,7 +9,7 @@
  * TODO: Mobility (line 119 - 149)
  * Use two different position allocators for the eNodeBs and the UEs.
  * Choose a suitable mobility model for the UEs to mimic the movement of pedestrians.
-*/
+ */
 
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
