@@ -27,6 +27,11 @@ code .
 ./ns3 run "scratch/KPM-project/script.cc"
 ```
 
+For automated simulation run AFTER first run
+```bash
+python3 scratch/KPM-project/project.py
+```
+
 ## Task Checklist
 
 ### Instructions for Use
