@@ -1,7 +1,7 @@
 /*
  * Authors:
  * Frantisek Bilek <xbilek26@vutbr.cz>
- * ...
+ * Ondrej Dohnal <xdohna45@vutbr.cz>
  * ...
  * ...
  * 
@@ -22,6 +22,7 @@
 #include "ns3/network-module.h"
 #include "ns3/point-to-point-helper.h"
 #include "ns3/point-to-point-epc-helper.h"
+#include <fstream>
 
 /* ---------------------------- SIMULATION SCENARIO ----------------------------
  *
@@ -70,16 +71,38 @@ NS_LOG_COMPONENT_DEFINE("KPMProjectScript");
 
 int main(int argc, char *argv[])
 {
+
+    // Simulation parameters
+    double simTime = 10.0;
+    // Number of UEs (used multiple times in the code)
+    uint32_t numUes = 5;
+    std::string backBoneSpeed = "10Gbps";
+    std::string backBoneDelay = "5ms";
+    std::string outputPrefix = "sim";
+    std::string uesDataRate = "5Mbps";
+    std::string videoDataRate = "10Mbps";
+    bool verbose = false;
+
+    CommandLine cmd(__FILE__);
+    cmd.AddValue("simTime", "Simulation time", simTime);
+    cmd.AddValue("numUes", "Number of UEs", numUes);
+    cmd.AddValue("backBoneSpeed", "Speed of link between PG-W and internet", backBoneSpeed);
+    cmd.AddValue("backBoneDelay", "Delay of link between PG-W and internet", backBoneDelay);
+    cmd.AddValue("outputPrefix", "Prefix for output files", outputPrefix);
+    cmd.AddValue("uesDataRate", "Data rate of data exchange between UEs", uesDataRate);
+    cmd.AddValue("videoDataRate", "Data rate of video streaming from internet", videoDataRate);
+    cmd.AddValue("verbose", "Enable command line output", verbose);
+
+    cmd.Parse(argc, argv);
+
     LogComponentEnable("KPMProjectScript", LOG_LEVEL_INFO);
     //LogComponentEnable("PacketSink", LOG_LEVEL_INFO);
 
     ns3::PacketMetadata::Enable();
 
-    // Number of UEs (used multiple times in the code)
-    uint32_t numUes = 5;
+    
 
-    // Simulation parameters
-    double simTime = 10.0;
+    
 
     // Create LTE Helper and EPC Helper
     Ptr<LteHelper> lteHelper = CreateObject<LteHelper>();
@@ -101,8 +124,8 @@ int main(int argc, char *argv[])
 
     // Set up point-to-point link between P-GW and remote host
     PointToPointHelper p2p;
-    p2p.SetDeviceAttribute("DataRate", StringValue("100Gbps"));
-    p2p.SetChannelAttribute("Delay", StringValue("10ms"));
+    p2p.SetDeviceAttribute("DataRate", StringValue(backBoneSpeed));
+    p2p.SetChannelAttribute("Delay", StringValue(backBoneDelay));
     Ptr<Node> pgw = epcHelper->GetPgwNode();
     NetDeviceContainer internetDevices = p2p.Install(remoteHost, pgw);
 
@@ -111,14 +134,24 @@ int main(int argc, char *argv[])
     Ptr<Node> mme = NodeList::GetNode(2); // No getter method for MME
 
     // Enable pcap tracing on point-to-point link
-    p2p.EnablePcapAll("p2p");
+    std::stringstream pcapName;
+    pcapName << outputPrefix << "-" << "p2p";
+    p2p.EnablePcapAll(pcapName.str());
 
     // Assign IP addresses to point-to-point link (internet)
     Ipv4AddressHelper ipv4hInternet;
     ipv4hInternet.SetBase("1.0.0.0", "255.0.0.0");
     Ipv4InterfaceContainer internetIpIfaces = ipv4hInternet.Assign(internetDevices);
-    NS_LOG_INFO("Remote host address: " << internetIpIfaces.GetAddress(0));
-    NS_LOG_INFO("P-GW address: " << internetIpIfaces.GetAddress(1));
+    std::fstream addresses;
+    std::stringstream addressFile;
+    addressFile << outputPrefix << "-" << "addresses.txt";
+    addresses.open(addressFile.str(), std::fstream::out | std::fstream::trunc);
+    addresses << "Remote host address: " << internetIpIfaces.GetAddress(0) << std::endl;
+    addresses << "P-GW address: " << internetIpIfaces.GetAddress(1) << std::endl;
+    if(verbose){
+        NS_LOG_INFO("Remote host address: " << internetIpIfaces.GetAddress(0));
+        NS_LOG_INFO("P-GW address: " << internetIpIfaces.GetAddress(1));
+    }
 
     // Create static routing
     Ipv4StaticRoutingHelper ipv4RoutingHelper;
@@ -172,15 +205,19 @@ int main(int argc, char *argv[])
 
     for (uint32_t i = 0; i < numUes; i++)
     {
-        NS_LOG_INFO("UE " << i << " IP Address: " << ueIpIfaces.GetAddress(i));
+        addresses << "UE " << i << " IP Address: " << ueIpIfaces.GetAddress(i) << std::endl; 
+        if(verbose) NS_LOG_INFO("UE " << i << " IP Address: " << ueIpIfaces.GetAddress(i));
     }
 
     // Attach UEs 0, 2 and 4 to eNodeB 0 and UEs 1 and 3 to eNodeB 1
     for (uint32_t i = 0; i < numUes; i++)
     {
         lteHelper->Attach(ueLteDevs.Get(i), enbLteDevs.Get(i % 2));
-        NS_LOG_INFO("Attached UE " << i << " to eNodeB " << i % 2);
+        addresses << "Attached UE " << i << " to eNodeB " << i % 2 << std::endl; 
+        if(verbose) NS_LOG_INFO("Attached UE " << i << " to eNodeB " << i % 2);
     }
+    addresses.flush();
+    addresses.close();
 
     // Definitions of ports to send traffic to
     uint16_t tcpPort = 4000;
@@ -194,7 +231,7 @@ int main(int argc, char *argv[])
     {
         // Traffic sources, TCP clients
         OnOffHelper onOffHelper("ns3::TcpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(1 - i), tcpPort));
-        onOffHelper.SetConstantRate(DataRate("100kbps"));
+        onOffHelper.SetConstantRate(DataRate(uesDataRate));
         sourceApps.Add(onOffHelper.Install(ueNodes.Get(i)));
 
         // Traffic sinks, TCP servers
@@ -207,7 +244,7 @@ int main(int argc, char *argv[])
     {
         // Traffic source (Remote Host), UDP client
         OnOffHelper onOffHelper("ns3::UdpSocketFactory", InetSocketAddress(ueIpIfaces.GetAddress(i), udpPort));
-        onOffHelper.SetConstantRate(DataRate("100kbps"));
+        onOffHelper.SetConstantRate(DataRate(videoDataRate));
         sourceApps.Add(onOffHelper.Install(remoteHost));
 
         // Traffic sinks, UDP servers
@@ -227,11 +264,14 @@ int main(int argc, char *argv[])
     monitor->Start(Seconds(1.0));
 
     // NetAnim configuration
+
+    std::stringstream animationFile;
+    animationFile << outputPrefix << "-" << "netanim.xml";
     AnimationInterface::SetConstantPosition(remoteHost, 50.0, 5.0);
     AnimationInterface::SetConstantPosition(pgw, 50.0, 20.0);
     AnimationInterface::SetConstantPosition(sgw, 50.0, 35.0);
     AnimationInterface::SetConstantPosition(mme, 75.0, 35.0);
-    AnimationInterface anim("lte-simulation.xml");
+    AnimationInterface anim(animationFile.str());
     anim.EnablePacketMetadata(true);
     anim.SetMobilityPollInterval(Seconds(0.05));
 
@@ -281,23 +321,36 @@ int main(int argc, char *argv[])
     Ptr <Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier>(flowMonHelper.GetClassifier());
     std::map <FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats();
 
-    std::cout << std::endl << "************* FLOW MONITOR STATISTICS *************" << std::endl;
+    std::stringstream flowMonOutput;
+
+    flowMonOutput << std::endl << "************* FLOW MONITOR STATISTICS *************" << std::endl;
     for (std::map<FlowId, FlowMonitor::FlowStats>::const_iterator i = stats.begin(); i != stats.end(); i++) {
+        std::stringstream flowMon;
         Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow(i->first);
-        std::cout << "Flow ID: " << i->first << std::endl;
-        std::cout << "Src address: " << t.sourceAddress << " -> Dst address: " << t.destinationAddress << std::endl;
-        std::cout << "Src port: " << t.sourcePort << " -> Dst port: " << t.destinationPort << std::endl;
-        std::cout << "Tx Packets/Bytes: " << i->second.txPackets << "/" << i->second.txBytes << std::endl;
-        std::cout << "Rx Packets/Bytes: " << i->second.rxPackets << "/" << i->second.rxBytes << std::endl;
-        std::cout << "Throughput: " << i->second.rxBytes * 8.0 / (i->second.timeLastRxPacket.GetSeconds() - i->second.timeFirstTxPacket.GetSeconds()) / 1024 << " kb/s" << std::endl;
-        std::cout << "Delay sum: " << i->second.delaySum.GetMilliSeconds() << " ms" << std::endl;
-        std::cout << "Mean delay: " << (i->second.delaySum.GetSeconds() / i->second.rxPackets) * 1000 << " ms" << std::endl;
-        std::cout << "Jitter sum: " << i->second.jitterSum.GetMilliSeconds() << " ms" << std::endl;
-        std::cout << "Mean jitter: " << (i->second.jitterSum.GetSeconds() / (i->second.rxPackets - 1)) * 1000 << " ms" << std::endl;
-        std::cout << "Lost Packets: " << i->second.txPackets - i->second.rxPackets << std::endl;
-        std::cout << "Packet loss: " << (((i->second.txPackets - i->second.rxPackets) * 1.0) / i->second.txPackets) * 100 << " %" << std::endl;
-        std::cout << "------------------------------------------------" << std::endl;
+        flowMon << "Flow ID: " << i->first << std::endl;
+        flowMon << "Src address: " << t.sourceAddress << " -> Dst address: " << t.destinationAddress << std::endl;
+        flowMon << "Src port: " << t.sourcePort << " -> Dst port: " << t.destinationPort << std::endl;
+        flowMon << "Tx Packets/Bytes: " << i->second.txPackets << "/" << i->second.txBytes << std::endl;
+        flowMon << "Rx Packets/Bytes: " << i->second.rxPackets << "/" << i->second.rxBytes << std::endl;
+        flowMon << "Throughput: " << i->second.rxBytes * 8.0 / (i->second.timeLastRxPacket.GetSeconds() - i->second.timeFirstTxPacket.GetSeconds()) / 1024 << " kb/s" << std::endl;
+        flowMon << "Delay sum: " << i->second.delaySum.GetMilliSeconds() << " ms" << std::endl;
+        flowMon << "Mean delay: " << (i->second.delaySum.GetSeconds() / i->second.rxPackets) * 1000 << " ms" << std::endl;
+        flowMon << "Jitter sum: " << i->second.jitterSum.GetMilliSeconds() << " ms" << std::endl;
+        flowMon << "Mean jitter: " << (i->second.jitterSum.GetSeconds() / (i->second.rxPackets - 1)) * 1000 << " ms" << std::endl;
+        flowMon << "Lost Packets: " << i->second.txPackets - i->second.rxPackets << std::endl;
+        flowMon << "Packet loss: " << (((i->second.txPackets - i->second.rxPackets) * 1.0) / i->second.txPackets) * 100 << " %" << std::endl;
+        flowMon << "------------------------------------------------" << std::endl;
+        flowMonOutput << flowMon.str();
+
+        std::fstream flowMonFile;
+        std::stringstream flowMonFileName;
+        flowMonFileName << outputPrefix << "-" << "flow-" << i->first << ".txt";
+        flowMonFile.open(flowMonFileName.str(), std::fstream::out | std::fstream::trunc);
+        flowMonFile << flowMon.str();
+        flowMonFile.flush();
+        flowMonFile.close();
     }
+    if (verbose) NS_LOG_INFO(flowMonOutput.str());
 
     Simulator::Destroy();
 
