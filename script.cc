@@ -2,13 +2,9 @@
  * Authors:
  * Frantisek Bilek <xbilek26@vutbr.cz>
  * Ondrej Dohnal <xdohna45@vutbr.cz>
- * ...
+ * Marek Fiala <xfiala59@vutbr.cz>
  * ...
  * 
- * TODO: Simulation Run
- * - Execute the simulation with different sets of parameters and collect data on network performance.
- * - Run the simulation for a sufficient duration to observe network behavior.
- * - Capture and analyze key metrics, such as throughput, latency, and packet loss.
  */
 
 #include "ns3/applications-module.h"
