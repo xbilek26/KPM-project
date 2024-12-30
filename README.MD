@@ -57,9 +57,9 @@ Generate traffic using NS-3 applications:
 - [x] Three UEs are streaming videos from the Internet.
 
 ### Simulation Run
-- [ ] Execute the simulation with different sets of parameters and collect data on network performance.
-- [ ] Run the simulation for a sufficient duration to observe network behavior.
-- [ ] Capture and analyze key metrics, such as throughput, latency, and packet loss.
+- [x] Execute the simulation with different sets of parameters and collect data on network performance.
+- [x] Run the simulation for a sufficient duration to observe network behavior.
+- [x] Capture and analyze key metrics, such as throughput, latency, and packet loss.
 
 ### Analysis and Report
 Prepare a detailed report:
