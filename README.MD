@@ -63,11 +63,11 @@ Generate traffic using NS-3 applications:
 
 ### Analysis and Report
 Prepare a detailed report:
-- [ ] Description of the network scenario.
-- [ ] Configuration settings, including LTE and application parameters.
-- [ ] Results and analysis of network performance.
-- [ ] Any issues encountered during the simulation and how they were resolved.
-- [ ] Recommendations for improving network performance (if applicable).
+- [x] Description of the network scenario.
+- [x] Configuration settings, including LTE and application parameters.
+- [x] Results and analysis of network performance.
+- [x] Any issues encountered during the simulation and how they were resolved.
+- [x] Recommendations for improving network performance (if applicable).
 
 ## Submission Checklist
 - [ ] Submit the report in a digital format, along with necessary simulation scripts and configuration files.
